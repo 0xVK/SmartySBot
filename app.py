@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import requests
+from telebot.apihelper import ApiTelegramException
 import telebot
 import datetime
 import sys
@@ -495,6 +496,33 @@ def stats_handler(message):
     bot.send_message(chat_id=message.chat.id, text=msg, parse_mode='HTML', reply_markup=keyboard)
 
 
+def send_or_split_by_separate_messages(timetable_days, user, additional_message=''):
+
+    rendered_timetable = additional_message
+
+    for day in timetable_days:
+        rendered_timetable += render_day_timetable(day, user_id=user.get_id())
+
+    if len(rendered_timetable) < 4090:
+        bot.send_message(user.get_id(), rendered_timetable, parse_mode='HTML', reply_markup=keyboard)
+        return
+
+    rendered_timetable_for_day = additional_message
+
+    while timetable_days:
+
+        timetable_day = timetable_days.pop(0)
+        rendered_timetable_for_day += render_day_timetable(timetable_day, user_id=user.get_id())
+
+        if len(rendered_timetable_for_day) > 4090:
+            rendered_timetable_for_day = rendered_timetable_for_day[:4040] + '\n\n\U000026A0<b> ' \
+                                                                             'Весь текст не помістився ' \
+                                                                             'у повідомлені \U000026A0</b>'
+
+        bot.send_message(user.get_id(), rendered_timetable_for_day, parse_mode='HTML', reply_markup=keyboard)
+        rendered_timetable_for_day = ''
+
+
 @bot.callback_query_handler(func=lambda call_back: call_back.data in ('\U00002B07 Поточний', '\U000027A1 Наступний'))
 def week_schedule_handler(call_back):
 
@@ -511,7 +539,6 @@ def week_schedule_handler(call_back):
     next_week_last_day = today + datetime.timedelta(days=diff_between_saturday_and_today + 7)
 
     timetable_data = list()
-    timetable_for_week = str()
     timetable_for_week_empty = str()
 
     if req == '\U00002B07 Поточний':
@@ -523,13 +550,13 @@ def week_schedule_handler(call_back):
         timetable_data = get_timetable(group=user_group, sdate=next_week_first_day.strftime('%d.%m.%Y'),
                                        edate=next_week_last_day.strftime('%d.%m.%Y'), user_id=user.get_id())
 
-    bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    try:
+        bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    except ApiTelegramException:
+        pass
 
     if timetable_data:
-        for timetable_day in timetable_data:
-            timetable_for_week += render_day_timetable(timetable_day, user_id=user.get_id())
-
-        bot.send_message(text=timetable_for_week, chat_id=user.get_id(), parse_mode="HTML", reply_markup=keyboard)
+        send_or_split_by_separate_messages(timetable_data, user)
 
     elif isinstance(timetable_data, list) and not len(timetable_data):
         bot_send_message_and_post_check_group(user.get_id(), timetable_for_week_empty, user_group)
@@ -541,7 +568,10 @@ def update_group_handler(call_back):
     user = core.User(call_back.message.chat)
     request = call_back.data
 
-    bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    try:
+        bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    except ApiTelegramException:
+        pass
 
     _, group = request.split(':')
 
@@ -561,7 +591,10 @@ def help_menu_handler(call_back):
     user = core.User(call_back.message.chat)
     request = call_back.data
 
-    bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    try:
+        bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    except ApiTelegramException:
+        pass
 
     if request == KEYBOARD['CHANGE_GROUP']:
 
@@ -609,7 +642,6 @@ def bot_send_message_and_post_check_group(chat_id='', text='', user_group='', pa
         if possible_groups:
             text += '\n\n<b>Можливі варіанти:</b>\n' + '\n'.join(possible_groups)
 
-        # text += '\n\n\U0001f9d0 Щоб змінити групу жми: {} > {}'.format(KEYBOARD['HELP'], KEYBOARD['CHANGE_GROUP'])
 
         change_group_kb = telebot.types.InlineKeyboardMarkup()
         change_group_kb.row(
@@ -666,7 +698,10 @@ def schedule_teacher_time_handler(call_back):
     time_type, teacher_name = call_back.data.split(':')
     teacher_name = core.get_teacher_fullname_by_first_symbols(teacher_name)
 
-    bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    try:
+        bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    except ApiTelegramException:
+        pass
 
     if time_type == '_S':  # Today
 
@@ -710,15 +745,11 @@ def schedule_teacher_time_handler(call_back):
         timetable_data = get_timetable(teacher=teacher_name, sdate=today, edate=in_week_day, user_id=user.get_id())
 
         if timetable_data:
-            timetable_for_a_week = '\U0001F464 Розклад на тиждень у <b>{}</b>:\n\n'.format(teacher_name)
-            for timetable_day in timetable_data:
-                timetable_for_a_week += render_day_timetable(timetable_day, user_id=user.get_id())
+            timetable_for_a_week = f'\U0001F464 Розклад на тиждень у <b>{teacher_name}</b>:\n\n'
+            send_or_split_by_separate_messages(timetable_data, user, timetable_for_a_week)
         elif isinstance(timetable_data, list) and not len(timetable_data):
             timetable_for_a_week = '\U0001f914 На тиждень пар у викладача <b>{}</b> не знайдено.'.format(teacher_name)
-        else:
-            return
-
-        bot.send_message(user.get_id(), timetable_for_a_week, reply_markup=keyboard, parse_mode='HTML')
+            bot.send_message(user.get_id(), timetable_for_a_week, reply_markup=keyboard, parse_mode='HTML')
 
 
 @bot.callback_query_handler(func=lambda call_back: call_back.data == 'Ввести прізвище'
@@ -727,7 +758,10 @@ def last_teacher_handler(call_back):
 
     user = core.User(call_back.message.chat)
 
-    bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    try:
+        bot.delete_message(chat_id=user.get_id(), message_id=call_back.message.message_id)
+    except ApiTelegramException:
+        pass
 
     if call_back.data == 'Ввести прізвище':
 
@@ -805,6 +839,7 @@ def select_teacher_by_second_name(message):
 def show_other_group(message):
 
     group = message.text
+    user = core.User(message.chat)
     core.log(message.chat, '> (по групі) {}'.format(group))
     bot.send_chat_action(message.chat.id, "typing")
 
@@ -838,17 +873,13 @@ def show_other_group(message):
     today = datetime.date.today().strftime('%d.%m.%Y')
 
     timetable_data = get_timetable(group=group, sdate=today, edate=in_week_day, user_id=message.chat.id)
-    timetable_for_week = '<b>Розклад на тиждень для групи {}:</b>\n\n'.format(message.text)
+    info = f'\U00002139 <b>Розклад на тиждень для групи {message.text}:</b>\n\n'
 
     if timetable_data:
-        for timetable_day in timetable_data:
-            timetable_for_week += render_day_timetable(timetable_day)
+        send_or_split_by_separate_messages(timetable_data, user, info)
     elif isinstance(timetable_data, list) and not len(timetable_data):
         timetable_for_week = 'На тиждень пар для групи {} не знайдено.'.format(group)
-    else:
-        return
-
-    bot.send_message(message.chat.id, timetable_for_week, parse_mode='HTML', reply_markup=keyboard)
+        bot.send_message(message.chat.id, timetable_for_week, parse_mode='HTML', reply_markup=keyboard)
 
 
 def add_ad(message):
@@ -1333,6 +1364,10 @@ def main_menu(message):
         if timetable_data:
 
             timetable_for_today = render_day_timetable(timetable_data[0], show_current=True, user_id=user.get_id())
+            if len(timetable_for_today) > 4090:
+                timetable_for_today = timetable_for_today[:4040] + '\n\n\U000026A0<b> ' \
+                                                                   'Весь текст не помістився ' \
+                                                                   'у повідомлені \U000026A0</b>'
             bot.send_message(user.get_id(), timetable_for_today, parse_mode='HTML', reply_markup=keyboard)
 
         elif isinstance(timetable_data, list) and not len(timetable_data):
@@ -1349,6 +1384,10 @@ def main_menu(message):
 
         if timetable_data:
             timetable_for_tomorrow = render_day_timetable(timetable_data[0], user_id=user.get_id())
+            if len(timetable_for_tomorrow) > 4090:
+                timetable_for_tomorrow = timetable_for_tomorrow[:4040] + '\n\n\U000026A0<b> ' \
+                                                                         'Весь текст не помістився ' \
+                                                                         'у повідомлені \U000026A0</b>'
             bot.send_message(user.get_id(), timetable_for_tomorrow, parse_mode='HTML', reply_markup=keyboard)
 
         elif isinstance(timetable_data, list) and not len(timetable_data):
@@ -1371,11 +1410,7 @@ def main_menu(message):
                                            edate=next_week_last_day.strftime('%d.%m.%Y'), user_id=user.get_id())
 
             if timetable_data:
-                for timetable_day in timetable_data:
-                    timetable_for_week += render_day_timetable(timetable_day, user_id=user.get_id())
-
-                bot.send_message(text=timetable_for_week, chat_id=user.get_id(),
-                                 reply_markup=keyboard, parse_mode="HTML")
+                send_or_split_by_separate_messages(timetable_data, user)
                 return
 
             elif isinstance(timetable_data, list) and not len(timetable_data):
@@ -1499,7 +1534,6 @@ def main_menu(message):
 
         s_date = message.text.split('-')[0] + '.' + str(datetime.date.today().year)
         e_date = message.text.split('-')[1] + '.' + str(datetime.date.today().year)
-        timetable_for_days = ''
         timetable_days = get_timetable(group=user_group, sdate=s_date, edate=e_date, user_id=user.get_id())
 
         if isinstance(timetable_days, list) and not len(timetable_days):
@@ -1514,22 +1548,8 @@ def main_menu(message):
             bot.send_message(user.get_id(), timetable_for_days, parse_mode='HTML', reply_markup=keyboard)
             return
 
-        current_number = 1
-
-        while timetable_days:
-            timetable_day = timetable_days.pop(0)
-
-            timetable_for_days += render_day_timetable(timetable_day, user_id=user.get_id())
-
-            if current_number < settings.LIMIT_OF_DAYS_PER_ONE_MESSAGE_IN_TO_DATE_TIMETABLE:
-                current_number += 1
-            else:
-                current_number = 1
-                bot.send_message(user.get_id(), timetable_for_days, parse_mode='HTML', reply_markup=keyboard)
-                timetable_for_days = ''
-
-        if timetable_for_days:
-            bot.send_message(user.get_id(), timetable_for_days, parse_mode='HTML', reply_markup=keyboard)
+        if timetable_days:
+            send_or_split_by_separate_messages(timetable_days, user)
 
     elif re.search(r'^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$', request):
 
@@ -1553,37 +1573,20 @@ def main_menu(message):
 
         s_date = request.split('-')[0]
         e_date = request.split('-')[1]
-        timetable_for_days = ''
         timetable_days = get_timetable(group=user_group, sdate=s_date, edate=e_date, user_id=user.get_id())
 
         if isinstance(timetable_days, list) and not len(timetable_days):
             msg = 'Щоб подивитися розклад на конкретний день, введи дату в такому форматі:' \
                   '\n<b>05.03</b> або <b>5.3</b>\nПо кільком дням: \n<b>5.03-15.03</b>\n' \
                   '\nДата вводиться без пробілів (день.місяць)<b> рік вводити не треба</b> '
-            timetable_for_days = 'На <b>{} - {}</b>, для групи <b>{}</b> пар не знайдено.\n\n{}'.format(s_date,
-                                                                                                        e_date,
-                                                                                                        user_group,
-                                                                                                        msg)
+            timetable_for_days = f'На <b>{s_date} - {e_date}</b>, для групи <b>{user_group}</b> ' \
+                                 f'пар не знайдено.\n\n{msg}'
 
             bot.send_message(user.get_id(), timetable_for_days, parse_mode='HTML', reply_markup=keyboard)
             return
 
-        current_number = 1
-
-        while timetable_days:
-            timetable_day = timetable_days.pop(0)
-
-            timetable_for_days += render_day_timetable(timetable_day, user_id=user.get_id())
-
-            if current_number < settings.LIMIT_OF_DAYS_PER_ONE_MESSAGE_IN_TO_DATE_TIMETABLE:
-                current_number += 1
-            else:
-                current_number = 1
-                bot.send_message(user.get_id(), timetable_for_days, parse_mode='HTML', reply_markup=keyboard)
-                timetable_for_days = ''
-
-        if timetable_for_days:
-            bot.send_message(user.get_id(), timetable_for_days, parse_mode='HTML', reply_markup=keyboard)
+        if timetable_days:
+            send_or_split_by_separate_messages(timetable_days, user)
 
     elif any(map(str.isdigit, request)):
 
