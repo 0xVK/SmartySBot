@@ -1,22 +1,23 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-import requests
-from telebot.apihelper import ApiTelegramException
-import telebot
 import datetime
-import sys
-import os
-import settings
-import core
-import re
-import json
-import schedule_updater
-import random
 import hashlib
+import json
+import os
+import random
 import re
+import sys
+
+import requests
+import telebot
 import xmltodict
-from settings import KEYBOARD
 from flask import Flask, request, render_template, jsonify, session, redirect, url_for
+from telebot.apihelper import ApiTelegramException
+
+import core
+import schedule_updater
+import settings
+from settings import KEYBOARD
 
 app = Flask(__name__, template_folder='site', static_folder='site/static', static_url_path='/fl/static')
 app.secret_key = hashlib.md5(settings.ADMIN_PASSWORD.encode('utf-8')).hexdigest()
