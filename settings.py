@@ -42,9 +42,6 @@ HTTP_USER_AGENT = 'Telegram-SmartySBot'
 # Number of teachers to save
 NUMBER_OF_TEACHERS_TO_SAVE = 4
 
-# Limit how many days can contain one message. When user gets timetable by dates
-LIMIT_OF_DAYS_PER_ONE_MESSAGE_IN_TO_DATE_TIMETABLE = 6
-
 # Show time to end
 SHOW_TIME_TO_LESSON_END = True
 
