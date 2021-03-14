@@ -1,11 +1,12 @@
-import settings
-import sqlite3
-import os
 import datetime
-import json
-import requests
-import pprint
 import difflib
+import json
+import os
+import sqlite3
+
+import requests
+
+import settings
 
 
 class User:
@@ -66,7 +67,7 @@ class User:
         return DBManager.execute_query(query,
                                        (self.id, self.chat.username, self.chat.first_name,
                                         self.chat.last_name, group))
-    
+
     def update_user_metadata(self):
 
         query = "UPDATE users SET requests_count=requests_count+1, last_use_date=datetime('now', 'localtime')," \
@@ -176,7 +177,6 @@ class DBManager:
 
 
 def log(chat=None, msg='', is_error=False):
-
     now_time = datetime.datetime.now().strftime('%d-%m %H:%M:%S')
 
     filename = 'error_log.txt' if is_error else 'bot_log.log'
@@ -189,13 +189,11 @@ def log(chat=None, msg='', is_error=False):
 
 
 def delete_html_tags(s):
-
     if s:
         return s.replace('>', '').replace('<', '')
 
 
 def datetime_to_string(input_seconds=0):
-
     input_seconds = int(input_seconds)
 
     minutes, seconds = divmod(input_seconds, 60)
@@ -215,14 +213,12 @@ class Cache:
 
     @classmethod
     def drop_cache_table(cls):
-
         query = 'DROP TABLE cache'
 
         return DBManager.execute_query(query)
 
     @classmethod
     def create_cache_table_if_not_exists(cls):
-
         query = """CREATE TABLE IF NOT EXISTS cache(
                           key TEXT PRIMARY KEY NOT NULL,
                           data TEXT DEFAULT CURRENT_TIMESTAMP,
@@ -234,7 +230,6 @@ class Cache:
 
     @classmethod
     def get_from_cache(cls, key):
-
         query = "SELECT * FROM cache WHERE key=?"
 
         r = DBManager.execute_query(query, (key,))
@@ -245,31 +240,26 @@ class Cache:
 
     @classmethod
     def recount_requests_to_cache(cls, key):
-
         query = "UPDATE cache SET requests=requests+1 WHERE key=?"
         return DBManager.execute_query(query, (key,))
 
     @classmethod
     def put_in_cache(cls, key, data):
-
         query = "INSERT or IGNORE INTO cache (key, data) VALUES (?, ?)"
         return DBManager.execute_query(query, (key, data))
 
     @classmethod
     def get_keys(cls):
-
         query = "SELECT key FROM cache"
         return DBManager.execute_query(query, )
 
     @classmethod
     def clear_cache(cls):
-
         query = "DELETE FROM cache"
         return DBManager.execute_query(query, )
 
     @classmethod
     def get_requests_to_cache(cls):
-
         query = "SELECT SUM(requests) FROM cache"
         return DBManager.execute_query(query, )
 
@@ -439,7 +429,7 @@ class MetricsManager:
 
         query = """SELECT * From metrics WHERE telegram_id = ?"""
 
-        user_actions_raw = DBManager.execute_query(query, (user_id, ))
+        user_actions_raw = DBManager.execute_query(query, (user_id,))
         user_actions = []
 
         if not user_actions_raw:
@@ -524,7 +514,7 @@ class Teachers:
 
         query = """SELECT teacher_name FROM saved_teachers WHERE telegram_id = ? ORDER BY added_time"""
 
-        saved_teachers_raw = DBManager.execute_query(query, (user_id, )) or []
+        saved_teachers_raw = DBManager.execute_query(query, (user_id,)) or []
 
         saved_teachers = []
 
@@ -562,7 +552,6 @@ class Teachers:
 
 
 def update_all_groups():
-
     params = {
         'n': '701',
         'lev': '142',
@@ -591,7 +580,6 @@ def update_all_groups():
 
 
 def is_group_valid(user_group=''):
-
     user_group = user_group.lower().strip()
 
     try:
@@ -607,7 +595,6 @@ def is_group_valid(user_group=''):
 
 
 def get_possible_groups(user_group='', variants=4):
-
     with open(os.path.join(settings.BASE_DIR, 'data', 'groups.json'), 'r', encoding="utf-8") as file:
         all_groups = json.loads(file.read())
 
@@ -615,7 +602,6 @@ def get_possible_groups(user_group='', variants=4):
 
 
 def get_possible_teacher_by_lastname(last_name='', variants=1):
-
     with open(os.path.join(settings.BASE_DIR, 'data', 'teachers.json'), 'r', encoding="utf-8") as file:
         all_teachers_fullnames = json.loads(file.read())
 
@@ -627,7 +613,6 @@ def get_possible_teacher_by_lastname(last_name='', variants=1):
 
 
 def update_all_teachers():
-
     params = {
         'n': '701',
         'lev': '141',
@@ -649,7 +634,6 @@ def update_all_teachers():
 
 
 def is_teacher_valid(fullname):
-
     fullname = fullname.strip()
 
     try:
@@ -665,7 +649,6 @@ def is_teacher_valid(fullname):
 
 
 def get_teacher_fullname_by_first_symbols(name):
-
     with open(os.path.join(settings.BASE_DIR, 'data', 'teachers.json'), 'r', encoding='utf-8') as file:
         all_teachers = json.loads(file.read())
 
@@ -676,7 +659,6 @@ def get_teacher_fullname_by_first_symbols(name):
 
 
 def get_str_timetable_list():
-
     lessons_time_file = open(os.path.join(settings.BASE_DIR, 'data', 'lessons_time.json'), 'r', encoding="utf-8")
 
     lessons_time = json.loads(lessons_time_file.read())
@@ -736,14 +718,12 @@ class AdService:
             return 'Тут поки пусто.'
 
         for vip_ad in vip_ads:
-
             username = vip_ad[0]
             text = vip_ad[1]
 
             ads_rendered += '\U0001F525 <b>@{}</b>\n{}\n\n'.format(username, text)
 
         for ad in ads:
-
             username = ad[0]
             text = ad[1]
 
@@ -763,7 +743,7 @@ class AdService:
 
         query += ' ORDER BY creation_datetime'
 
-        ads = DBManager.execute_query(query,)
+        ads = DBManager.execute_query(query, )
 
         return ads
 
